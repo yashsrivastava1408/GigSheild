@@ -19,11 +19,11 @@ class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     api_v1_prefix: str = Field(default="/api/v1", alias="API_V1_PREFIX")
     database_url: str = Field(
-        default="postgresql+psycopg://gigshield:gigshield@postgres:5432/gigshield",
+        default="",
         alias="DATABASE_URL",
     )
-    secret_key: str = Field(default="change-me", alias="SECRET_KEY")
-    admin_api_key: str = Field(default="dev-admin-key", alias="ADMIN_API_KEY")
+    secret_key: str = Field(default="", alias="SECRET_KEY")
+    admin_api_key: str = Field(default="", alias="ADMIN_API_KEY")
     access_token_ttl_minutes: int = Field(default=720, alias="ACCESS_TOKEN_TTL_MINUTES")
     otp_ttl_minutes: int = Field(default=10, alias="OTP_TTL_MINUTES")
     use_mock_sms: bool = Field(default=True, alias="USE_MOCK_SMS")
