@@ -1,0 +1,18 @@
+{
+  "name": "GigShield",
+  "short_name": "GigShield",
+  "description": "Mobile-first parametric insurance for India's gig workers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff4df",
+  "theme_color": "#ff6a2a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/gigshield-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
