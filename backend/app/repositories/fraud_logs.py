@@ -13,3 +13,8 @@ def create_fraud_log(db: Session, fraud_log: FraudLog) -> FraudLog:
 
 def list_fraud_logs(db: Session) -> list[FraudLog]:
     return list(db.scalars(select(FraudLog).order_by(FraudLog.created_at.desc())))
+
+
+def list_fraud_logs_for_worker(db: Session, worker_id: str) -> list[FraudLog]:
+    statement = select(FraudLog).where(FraudLog.worker_id == worker_id).order_by(FraudLog.created_at.desc())
+    return list(db.scalars(statement))

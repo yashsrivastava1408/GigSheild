@@ -10,6 +10,7 @@ from app.repositories.policies import create_policy, get_active_policy_for_worke
 from app.schemas.policy import PolicyPurchaseRequest
 from app.schemas.premium import PremiumQuoteQuery
 from app.services.premium import build_quote_response
+from app.services.trust import recompute_trust_score
 from app.services.workers import require_worker
 
 
@@ -45,4 +46,6 @@ def purchase_policy(db: Session, payload: PolicyPurchaseRequest) -> tuple[Policy
         end_date=start_date + timedelta(days=6),
         status=PolicyStatus.active,
     )
-    return create_policy(db, policy), quote.risk_score, quote.risk_multiplier
+    created_policy = create_policy(db, policy)
+    recompute_trust_score(db, worker)
+    return created_policy, quote.risk_score, quote.risk_multiplier

@@ -1,7 +1,6 @@
-import type { Claim, CoverageTier, DisruptionEvent, FraudLog, Policy, Payout, QuoteResponse, Worker } from "../lib/api";
+import type { Claim, CoverageTier, DisruptionEvent, Policy, Payout, QuoteResponse, Worker } from "../lib/api";
 import { tierCards } from "../lib/constants";
 import { formatCurrency, formatDate, prettyZone } from "../lib/format";
-import { Field } from "./Field";
 
 export function WorkerDashboard({
   worker,
@@ -13,49 +12,63 @@ export function WorkerDashboard({
   policies,
   claims,
   payouts,
-  adminClaims,
-  fraudLogs,
-  adminKey,
-  setAdminKey,
   disruptions,
   isFetchingQuote,
   isBuying,
-  isLoadingAdmin,
   onQuote,
   onBuy,
   onLogout,
-  onLoadAdmin,
   onRefresh,
-  onApproveClaim,
-  onRejectClaim,
 }: {
   worker: Worker;
   selectedTier: CoverageTier;
   setSelectedTier: (tier: CoverageTier) => void;
-  activeTab: "overview" | "history" | "admin";
-  setActiveTab: (tab: "overview" | "history" | "admin") => void;
+  activeTab: "overview" | "history";
+  setActiveTab: (tab: "overview" | "history") => void;
   quote: QuoteResponse | null;
   policies: Policy[];
   claims: Claim[];
   payouts: Payout[];
-  adminClaims: Claim[];
-  fraudLogs: FraudLog[];
-  adminKey: string;
-  setAdminKey: (value: string) => void;
   disruptions: DisruptionEvent[];
   isFetchingQuote: boolean;
   isBuying: boolean;
-  isLoadingAdmin: boolean;
   onQuote: () => void;
   onBuy: () => void;
   onLogout: () => void;
-  onLoadAdmin: () => void;
   onRefresh: () => void;
-  onApproveClaim: (claimId: string) => void;
-  onRejectClaim: (claimId: string) => void;
 }) {
   const activePolicy = policies.find((policy) => policy.status === "active") ?? policies[0] ?? null;
   const localDisruption = disruptions.find((event) => event.zone_id === worker.zone_id) ?? null;
+  const workerTimeline = [
+    ...policies.map((policy) => ({
+      id: `policy-${policy.id}`,
+      title: `${policy.coverage_tier} policy ${policy.status}`,
+      timestamp: policy.created_at,
+      meta: formatDate(policy.created_at),
+    })),
+    ...claims.map((claim) => ({
+      id: `claim-${claim.id}`,
+      title: `Claim ${claim.status}`,
+      timestamp: claim.created_at,
+      meta: `${formatCurrency(claim.amount)} · ${formatDate(claim.created_at)}`,
+    })),
+    ...payouts.map((payout) => ({
+      id: `payout-${payout.id}`,
+      title: `Payout ${payout.status}`,
+      timestamp: payout.processed_at,
+      meta: `${formatCurrency(payout.amount)} · ${formatDate(payout.processed_at)}`,
+    })),
+    ...disruptions
+      .filter((event) => event.zone_id === worker.zone_id)
+      .map((event) => ({
+        id: `event-${event.id}`,
+        title: `${event.event_type.replace(/_/g, " ")} detected`,
+        timestamp: event.started_at,
+        meta: `Severity ${event.severity}/4 · ${formatDate(event.started_at)}`,
+      })),
+  ]
+    .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime())
+    .slice(0, 6);
 
   return (
     <section className="workspace-grid">
@@ -180,7 +193,7 @@ export function WorkerDashboard({
 
       <div className="side-stack">
         <div className="tabbar">
-          {(["overview", "history", "admin"] as const).map((tab) => (
+          {(["overview", "history"] as const).map((tab) => (
             <button
               key={tab}
               type="button"
@@ -285,6 +298,25 @@ export function WorkerDashboard({
                 </div>
               </div>
             </div>
+
+            <div className="dashboard-card">
+              <div className="section-head">
+                <p className="eyebrow">Activity feed</p>
+                <h3>Recent worker timeline</h3>
+              </div>
+              {workerTimeline.length > 0 ? (
+                <div className="mini-list">
+                  {workerTimeline.map((item) => (
+                    <article key={item.id} className="mini-card timeline-card">
+                      <span>{item.title}</span>
+                      <strong>{item.meta}</strong>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted-copy">New activity will appear here after policy, claim, or disruption events.</p>
+              )}
+            </div>
           </>
         ) : null}
 
@@ -328,67 +360,6 @@ export function WorkerDashboard({
               )}
             </div>
           </>
-        ) : null}
-
-        {activeTab === "admin" ? (
-          <div className="dashboard-card">
-            <div className="section-head">
-              <p className="eyebrow">Admin tools</p>
-              <h3>Manual review and fraud logs</h3>
-            </div>
-
-            <Field label="Admin API key">
-              <input
-                value={adminKey}
-                onChange={(event) => setAdminKey(event.target.value)}
-                placeholder="Paste admin key"
-              />
-            </Field>
-
-            <div className="action-row top-gap">
-              <button className="secondary-action" type="button" onClick={onLoadAdmin} disabled={isLoadingAdmin}>
-                {isLoadingAdmin ? "Loading..." : "Load admin feed"}
-              </button>
-            </div>
-
-            <div className="mini-list">
-              <h4>Claims waiting for review</h4>
-              {adminClaims.length > 0 ? (
-                adminClaims.map((claim) => (
-                  <article key={claim.id} className="admin-card">
-                    <div>
-                      <span>{claim.worker_id.slice(0, 8)}</span>
-                      <strong>{formatCurrency(claim.amount)}</strong>
-                    </div>
-                    <div className="admin-actions">
-                      <button type="button" className="mini-action approve" onClick={() => onApproveClaim(claim.id)}>
-                        Approve
-                      </button>
-                      <button type="button" className="mini-action reject" onClick={() => onRejectClaim(claim.id)}>
-                        Reject
-                      </button>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <p className="muted-copy">No claims in manual review.</p>
-              )}
-            </div>
-
-            <div className="mini-list">
-              <h4>Fraud logs</h4>
-              {fraudLogs.length > 0 ? (
-                fraudLogs.slice(0, 6).map((log) => (
-                  <article key={log.id} className="mini-card">
-                    <span>{log.fraud_type}</span>
-                    <strong>{log.action_taken}</strong>
-                  </article>
-                ))
-              ) : (
-                <p className="muted-copy">No fraud logs loaded.</p>
-              )}
-            </div>
-          </div>
         ) : null}
       </div>
     </section>

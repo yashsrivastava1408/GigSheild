@@ -4,6 +4,7 @@ import {
   approveAdminClaim,
   createPolicy,
   DEFAULT_ADMIN_KEY,
+  expirePolicies,
   getCurrentWorker,
   getPremiumQuote,
   listAdminClaims,
@@ -15,7 +16,10 @@ import {
   rejectAdminClaim,
   registerWorker,
   requestOtp,
+  syncWeather,
   verifyOtp,
+  type AdminOpsPolicyExpiryResult,
+  type AdminOpsWeatherSyncResult,
   type Claim,
   type CoverageTier,
   type DisruptionEvent,
@@ -37,6 +41,7 @@ import {
 } from "./lib/constants";
 import { formatCurrency, inferCity } from "./lib/format";
 import { usePersistentState } from "./lib/state";
+import { AdminConsole } from "./components/AdminConsole";
 import { AuthFlow, type AuthStage, type FormState } from "./components/AuthFlow";
 import { HeroSection } from "./components/HeroSection";
 import { WorkerDashboard } from "./components/WorkerDashboard";
@@ -57,7 +62,14 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
+type AppRoute = "worker" | "admin";
+
+function getRouteFromPath(pathname: string): AppRoute {
+  return pathname.startsWith("/admin") ? "admin" : "worker";
+}
+
 export default function App() {
+  const [route, setRoute] = useState<AppRoute>(() => getRouteFromPath(window.location.pathname));
   const [form, setForm] = usePersistentState<FormState>(FORM_KEY, initialFormState);
   const [selectedTier, setSelectedTier] = usePersistentState<CoverageTier>(TIER_KEY, "standard");
   const [worker, setWorker] = useState<Worker | null>(null);
@@ -73,9 +85,13 @@ export default function App() {
   const [adminKey, setAdminKey] = usePersistentState<string>(ADMIN_KEY, DEFAULT_ADMIN_KEY);
   const [adminClaims, setAdminClaims] = useState<Claim[]>([]);
   const [fraudLogs, setFraudLogs] = useState<FraudLog[]>([]);
-  const [activeTab, setActiveTab] = usePersistentState<"overview" | "history" | "admin">(TAB_KEY, "overview");
+  const [latestWeatherSync, setLatestWeatherSync] = useState<AdminOpsWeatherSyncResult[] | null>(null);
+  const [latestPolicyExpiry, setLatestPolicyExpiry] = useState<AdminOpsPolicyExpiryResult | null>(null);
+  const [activeTab, setActiveTab] = usePersistentState<"overview" | "history">(TAB_KEY, "overview");
   const [authStage, setAuthStage] = useState<AuthStage>("phone");
-  const [status, setStatus] = useState("Cover every working week with fast onboarding, simple pricing, and payout support when disruption hits.");
+  const [status, setStatus] = useState(
+    "Cover every working week with fast onboarding, simple pricing, and payout support when disruption hits.",
+  );
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isBooting, setIsBooting] = useState(true);
@@ -85,8 +101,12 @@ export default function App() {
   const [isFetchingQuote, setIsFetchingQuote] = useState(false);
   const [isBuying, setIsBuying] = useState(false);
   const [isLoadingAdmin, setIsLoadingAdmin] = useState(false);
+  const [isRunningWeatherSync, setIsRunningWeatherSync] = useState(false);
+  const [isRunningPolicyExpiry, setIsRunningPolicyExpiry] = useState(false);
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallDismissed, setIsInstallDismissed] = usePersistentState<boolean>(INSTALL_DISMISSED_KEY, false);
+  const [isAdminPromptOpen, setIsAdminPromptOpen] = useState(false);
+  const [adminPromptValue, setAdminPromptValue] = useState("");
 
   const canRegister = useMemo(
     () =>
@@ -96,6 +116,26 @@ export default function App() {
       Number(form.tenureDays) >= 0,
     [form],
   );
+
+  useEffect(() => {
+    const onPopState = () => {
+      setRoute(getRouteFromPath(window.location.pathname));
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    const onShortcut = (event: KeyboardEvent) => {
+      if (event.key === ";" && event.ctrlKey) {
+        event.preventDefault();
+        setIsAdminPromptOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onShortcut);
+    return () => window.removeEventListener("keydown", onShortcut);
+  }, []);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: Event) => {
@@ -185,10 +225,21 @@ export default function App() {
   }, [selectedTier, form.platform, form.zoneId, form.avgWeeklyEarnings, form.tenureDays]);
 
   useEffect(() => {
-    if (!["overview", "history", "admin"].includes(activeTab)) {
+    if (!["overview", "history"].includes(activeTab)) {
       setActiveTab("overview");
     }
   }, [activeTab, setActiveTab]);
+
+  function navigateTo(nextRoute: AppRoute) {
+    const nextPath = nextRoute === "admin" ? "/admin" : "/";
+    if (window.location.pathname !== nextPath) {
+      window.history.pushState({}, "", nextPath);
+    }
+    setRoute(nextRoute);
+    if (nextRoute === "admin") {
+      void loadAdminPanel();
+    }
+  }
 
   function hydrateFormFromWorker(currentWorker: Worker) {
     setForm((current) => ({
@@ -237,6 +288,52 @@ export default function App() {
       setError(requestError instanceof Error ? requestError.message : "Could not load admin data.");
     } finally {
       setIsLoadingAdmin(false);
+    }
+  }
+
+  async function handleSyncWeather() {
+    if (!adminKey.trim()) {
+      setError("Enter the admin API key to run weather sync.");
+      return;
+    }
+
+    setError(null);
+    setIsRunningWeatherSync(true);
+    try {
+      const createdEvents = await syncWeather(adminKey);
+      setLatestWeatherSync(createdEvents);
+      setDisruptions(await listDisruptions());
+      setNotice(
+        createdEvents.length > 0
+          ? `Weather sync created ${createdEvents.length} event(s).`
+          : "Weather sync ran with no new events.",
+      );
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not run weather sync.");
+    } finally {
+      setIsRunningWeatherSync(false);
+    }
+  }
+
+  async function handleExpirePolicies() {
+    if (!adminKey.trim()) {
+      setError("Enter the admin API key to expire policies.");
+      return;
+    }
+
+    setError(null);
+    setIsRunningPolicyExpiry(true);
+    try {
+      const result = await expirePolicies(adminKey);
+      setLatestPolicyExpiry(result);
+      if (worker) {
+        await loadDashboard(worker.id);
+      }
+      setNotice(`Policy expiry run completed. ${result.expired_policies} policies expired.`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not expire policies.");
+    } finally {
+      setIsRunningPolicyExpiry(false);
     }
   }
 
@@ -364,10 +461,12 @@ export default function App() {
         zone_id: form.zoneId,
         avg_weekly_earnings: Number(form.avgWeeklyEarnings),
         tenure_days: Number(form.tenureDays),
-        trust_score: worker?.trust_score ?? 75,
+        trust_score: worker?.trust_score ?? 60,
       });
       setQuote(nextQuote);
-      setStatus(`Quote ready. ${formatCurrency(nextQuote.weekly_premium)} per week for ${formatCurrency(nextQuote.coverage_amount)} cover.`);
+      setStatus(
+        `Quote ready. ${formatCurrency(nextQuote.weekly_premium)} per week for ${formatCurrency(nextQuote.coverage_amount)} cover.`,
+      );
       setNotice(`Quote refreshed: ${formatCurrency(nextQuote.weekly_premium)}`);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Could not fetch the policy quote.");
@@ -404,8 +503,6 @@ export default function App() {
     setPolicies([]);
     setClaims([]);
     setPayouts([]);
-    setAdminClaims([]);
-    setFraudLogs([]);
     setQuote(null);
     setOtpCode("");
     setMockOtpHint(null);
@@ -440,6 +537,34 @@ export default function App() {
     setInstallEvent(null);
   }
 
+  async function handleApproveClaim(claimId: string) {
+    await approveAdminClaim(claimId, adminKey);
+    setNotice("Claim approved.");
+    await loadAdminPanel();
+  }
+
+  function handleAdminPromptSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = adminPromptValue.trim();
+    if (!trimmed) {
+      return;
+    }
+    setAdminKey(trimmed);
+    setIsAdminPromptOpen(false);
+    void loadAdminPanel(trimmed);
+  }
+
+  function handleAdminPromptClose() {
+    setIsAdminPromptOpen(false);
+    setAdminPromptValue("");
+  }
+
+  async function handleRejectClaim(claimId: string) {
+    await rejectAdminClaim(claimId, adminKey);
+    setNotice("Claim rejected.");
+    await loadAdminPanel();
+  }
+
   if (isBooting) {
     return (
       <main className="app-shell">
@@ -451,10 +576,27 @@ export default function App() {
   return (
     <main className="app-shell">
       {notice ? <div className="notice-toast">{notice}</div> : null}
-
       {error ? <p className="inline-error global-error">{error}</p> : null}
 
-      {!token || !worker ? (
+      {route === "admin" ? (
+        <AdminConsole
+          adminKey={adminKey}
+          setAdminKey={setAdminKey}
+          adminClaims={adminClaims}
+          fraudLogs={fraudLogs}
+          latestWeatherSync={latestWeatherSync}
+          latestPolicyExpiry={latestPolicyExpiry}
+          isLoadingAdmin={isLoadingAdmin}
+          isRunningWeatherSync={isRunningWeatherSync}
+          isRunningPolicyExpiry={isRunningPolicyExpiry}
+          onLoadAdmin={() => void loadAdminPanel()}
+          onSyncWeather={() => void handleSyncWeather()}
+          onExpirePolicies={() => void handleExpirePolicies()}
+          onApproveClaim={(claimId) => void handleApproveClaim(claimId)}
+          onRejectClaim={(claimId) => void handleRejectClaim(claimId)}
+          onGoWorker={() => navigateTo("worker")}
+        />
+      ) : !token || !worker ? (
         <AuthFlow
           stage={authStage}
           form={form}
@@ -484,6 +626,7 @@ export default function App() {
             disruptions={disruptions}
             installEvent={installEvent}
             onInstall={() => void handleInstallApp()}
+            onOpenAdmin={() => navigateTo("admin")}
           />
 
           <WorkerDashboard
@@ -491,44 +634,45 @@ export default function App() {
             selectedTier={selectedTier}
             setSelectedTier={setSelectedTier}
             activeTab={activeTab}
-            setActiveTab={(tab) => {
-              setActiveTab(tab);
-              if (tab === "admin") {
-                void loadAdminPanel();
-              }
-            }}
+            setActiveTab={setActiveTab}
             quote={quote}
             policies={policies}
             claims={claims}
             payouts={payouts}
-            adminClaims={adminClaims}
-            fraudLogs={fraudLogs}
-            adminKey={adminKey}
-            setAdminKey={setAdminKey}
             disruptions={disruptions}
             isFetchingQuote={isFetchingQuote}
             isBuying={isBuying}
-            isLoadingAdmin={isLoadingAdmin}
             onQuote={() => void handleQuote()}
             onBuy={() => void handleBuyPolicy()}
             onLogout={logout}
-            onLoadAdmin={() => void loadAdminPanel()}
             onRefresh={() => void loadDashboard(worker.id)}
-            onApproveClaim={(claimId) => {
-              void approveAdminClaim(claimId, adminKey).then(async () => {
-                setNotice("Claim approved.");
-                await loadAdminPanel();
-              });
-            }}
-            onRejectClaim={(claimId) => {
-              void rejectAdminClaim(claimId, adminKey).then(async () => {
-                setNotice("Claim rejected.");
-                await loadAdminPanel();
-              });
-            }}
           />
         </>
       )}
+
+      {isAdminPromptOpen ? (
+        <div className="admin-prompt-overlay">
+          <form className="admin-prompt" onSubmit={handleAdminPromptSubmit}>
+            <h3>Enter admin secret</h3>
+            <p>Press Enter to load the admin queue.</p>
+            <input
+              type="password"
+              autoFocus
+              value={adminPromptValue}
+              onChange={(event) => setAdminPromptValue(event.target.value)}
+              placeholder="Paste ADMIN_API_KEY"
+            />
+            <div className="action-row top-gap">
+              <button className="secondary-action" type="button" onClick={handleAdminPromptClose}>
+                Cancel
+              </button>
+              <button className="primary-action" type="submit">
+                Unlock admin
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </main>
   );
 }

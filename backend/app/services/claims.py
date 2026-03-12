@@ -20,7 +20,8 @@ from app.repositories.payouts import create_payout, list_payouts_for_worker
 from app.repositories.policies import list_active_policies_for_zone
 from app.schemas.claim import AutoClaimCreateResponse
 from app.services.providers import issue_mock_payout_reference
-from app.services.workers import adjust_worker_trust, require_worker
+from app.services.trust import recompute_trust_score
+from app.services.workers import require_worker
 
 
 SEVERITY_MULTIPLIER = {
@@ -101,13 +102,12 @@ def create_automatic_claims(db: Session, disruption_event_id: str) -> AutoClaimC
                     status=PayoutStatus.completed,
                 ),
             )
-            adjust_worker_trust(db, worker, 2.0)
             total_payout_initiated += payout_amount
         elif claim_status == ClaimStatus.manual_review:
             manual_review += 1
         else:
             auto_rejected += 1
-            adjust_worker_trust(db, worker, -15.0)
+        recompute_trust_score(db, worker)
 
     return AutoClaimCreateResponse(
         disruption_event_id=event.id,
@@ -143,12 +143,12 @@ def approve_manual_claim(db: Session, claim: Claim) -> Payout:
             status=PayoutStatus.completed,
         ),
     )
-    adjust_worker_trust(db, require_worker(db, updated_claim.worker_id), 2.0)
+    recompute_trust_score(db, require_worker(db, updated_claim.worker_id))
     return payout
 
 
 def reject_manual_claim(db: Session, claim: Claim) -> Claim:
     claim.status = ClaimStatus.rejected
     updated_claim = update_claim(db, claim)
-    adjust_worker_trust(db, require_worker(db, updated_claim.worker_id), -15.0)
+    recompute_trust_score(db, require_worker(db, updated_claim.worker_id))
     return updated_claim

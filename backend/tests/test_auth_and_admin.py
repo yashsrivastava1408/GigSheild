@@ -9,7 +9,6 @@ from sqlalchemy.pool import StaticPool
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
-from app.models.worker import Worker
 
 
 engine = create_engine(
@@ -34,7 +33,7 @@ client = TestClient(app)
 ADMIN_HEADERS = {"x-admin-key": "dev-admin-key"}
 
 
-def _register_worker(phone: str, name: str, zone_id: str, tenure_days: int) -> str:
+def _register_worker(phone: str, name: str, zone_id: str, tenure_days: int, *, kyc_verified: bool = True) -> str:
     app.dependency_overrides[get_db] = override_get_db
     response = client.post(
         "/api/v1/workers/register",
@@ -45,7 +44,7 @@ def _register_worker(phone: str, name: str, zone_id: str, tenure_days: int) -> s
             "zone_id": zone_id,
             "avg_weekly_earnings": 3200,
             "tenure_days": tenure_days,
-            "kyc_verified": True,
+            "kyc_verified": kyc_verified,
         },
     )
     return response.json()["id"]
@@ -94,16 +93,7 @@ def test_auth_otp_login_and_me_endpoint() -> None:
 
 def test_manual_review_admin_approval_and_fraud_feed() -> None:
     app.dependency_overrides[get_db] = override_get_db
-    worker_id = _register_worker("9023456781", "Aman", "mumbai_zone_2", 5)
-    db = TestingSessionLocal()
-    try:
-        worker = db.get(Worker, worker_id)
-        assert worker is not None
-        worker.trust_score = 60
-        db.add(worker)
-        db.commit()
-    finally:
-        db.close()
+    worker_id = _register_worker("9023456781", "Aman", "mumbai_zone_2", 5, kyc_verified=False)
     _create_policy(worker_id, "basic")
     event_id = _create_event("mumbai_zone_2", 2)
 

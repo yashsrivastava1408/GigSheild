@@ -39,7 +39,7 @@ def test_auto_claim_creation_generates_claims_and_payouts() -> None:
             "phone": "9988776655",
             "name": "Vikram",
             "platform": "zomato",
-            "zone_id": "chennai_zone_4",
+            "zone_id": "hyderabad_zone_1",
             "avg_weekly_earnings": 3900,
             "tenure_days": 300,
             "kyc_verified": True,
@@ -56,7 +56,7 @@ def test_auto_claim_creation_generates_claims_and_payouts() -> None:
         "/api/v1/disruptions",
         json={
             "event_type": "heavy_rain",
-            "zone_id": "chennai_zone_4",
+            "zone_id": "hyderabad_zone_1",
             "severity": 3,
             "started_at": (datetime.now(UTC) - timedelta(hours=1)).isoformat(),
             "verified": True,

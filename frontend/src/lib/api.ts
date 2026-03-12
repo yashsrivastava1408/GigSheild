@@ -115,6 +115,21 @@ export type FraudLog = {
   created_at: string;
 };
 
+export type AdminOpsWeatherSyncResult = {
+  id: string;
+  event_type: string;
+  zone_id: string;
+  severity: number;
+  started_at: string;
+  ended_at: string | null;
+  weather_api_raw: Record<string, unknown> | null;
+  verified: boolean;
+};
+
+export type AdminOpsPolicyExpiryResult = {
+  expired_policies: number;
+};
+
 type RequestOptions = RequestInit & {
   searchParams?: Record<string, string | number>;
 };
@@ -249,6 +264,20 @@ export function rejectAdminClaim(claimId: string, adminKey: string): Promise<Cla
 export function listFraudLogs(adminKey: string): Promise<FraudLog[]> {
   return request<FraudLog[]>("/admin/fraud-logs", {
     method: "GET",
+    headers: { "x-admin-key": adminKey },
+  });
+}
+
+export function syncWeather(adminKey: string): Promise<AdminOpsWeatherSyncResult[]> {
+  return request<AdminOpsWeatherSyncResult[]>("/internal/weather/sync", {
+    method: "POST",
+    headers: { "x-admin-key": adminKey },
+  });
+}
+
+export function expirePolicies(adminKey: string): Promise<AdminOpsPolicyExpiryResult> {
+  return request<AdminOpsPolicyExpiryResult>("/internal/policies/expire", {
+    method: "POST",
     headers: { "x-admin-key": adminKey },
   });
 }

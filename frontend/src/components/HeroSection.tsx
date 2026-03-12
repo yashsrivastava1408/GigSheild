@@ -15,6 +15,7 @@ export function HeroSection({
   disruptions,
   installEvent,
   onInstall,
+  onOpenAdmin,
 }: {
   status: string;
   worker: Worker | null;
@@ -24,6 +25,7 @@ export function HeroSection({
   disruptions: DisruptionEvent[];
   installEvent: BeforeInstallPromptEvent | null;
   onInstall: () => void;
+  onOpenAdmin: () => void;
 }) {
   const disruptionBanner =
     disruptions.find((event) => worker && event.zone_id === worker.zone_id) ?? disruptions[0] ?? null;
@@ -47,6 +49,9 @@ export function HeroSection({
               Install app
             </button>
           ) : null}
+          <button type="button" className="secondary-action" onClick={onOpenAdmin}>
+            Open admin portal
+          </button>
           <div className="micro-badge">{worker ? `Signed in as ${worker.name}` : "Ready for worker onboarding"}</div>
         </div>
 
@@ -84,7 +89,7 @@ export function HeroSection({
           <article>
             <span>4</span>
             <strong>Live dashboard</strong>
-            <small>Policies, claims, payouts, admin</small>
+            <small>Policies, claims, payouts</small>
           </article>
         </div>
 

@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql+psycopg://gigshield:gigshield@postgres:5432/gigshield
+      - REDIS_URL=redis://redis:6379/0
+      # Load other vars from .env file
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - gigshield_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - gigshield_network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: gigshield
+      POSTGRES_USER: gigshield
+      POSTGRES_PASSWORD: gigshield
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - gigshield_network
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - gigshield_network
+
+networks:
+  gigshield_network:
+    driver: bridge
+
+volumes:
+  pgdata:

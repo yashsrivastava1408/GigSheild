@@ -10,6 +10,15 @@ export function formatDate(value: string): string {
   return new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
+export function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function inferCity(zoneId: string): "Chennai" | "Mumbai" | "Bengaluru" | "Delhi" {
   if (zoneId.startsWith("mumbai")) return "Mumbai";
   if (zoneId.startsWith("bengaluru")) return "Bengaluru";
