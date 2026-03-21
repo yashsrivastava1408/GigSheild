@@ -7,6 +7,7 @@ Create Date: 2026-03-21
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 revision = "20260321_0006"
@@ -16,9 +17,17 @@ depends_on = None
 
 
 def upgrade() -> None:
-    payout_profile_status = sa.Enum("missing", "pending", "verified", "rejected", name="payoutprofilestatus")
-    policy_payment_status = sa.Enum("created", "verified", "paid", "failed", name="policypaymentstatus")
-    payment_method = sa.Enum("upi", "bank_transfer", name="paymentmethod", create_type=False)
+    payout_profile_status = postgresql.ENUM(
+        "missing", "pending", "verified", "rejected", name="payoutprofilestatus", create_type=False
+    )
+    policy_payment_status = postgresql.ENUM(
+        "created", "verified", "paid", "failed", name="policypaymentstatus", create_type=False
+    )
+    payment_method = postgresql.ENUM("upi", "bank_transfer", name="paymentmethod", create_type=False)
+    bind = op.get_bind()
+    payout_profile_status.create(bind, checkfirst=True)
+    policy_payment_status.create(bind, checkfirst=True)
+    payment_method.create(bind, checkfirst=True)
 
     with op.batch_alter_table("otp_challenges") as batch_op:
         batch_op.add_column(sa.Column("attempt_count", sa.Integer(), nullable=False, server_default="0"))
@@ -46,7 +55,11 @@ def upgrade() -> None:
         sa.Column("id", sa.String(length=36), primary_key=True),
         sa.Column("worker_id", sa.String(length=36), nullable=False),
         sa.Column("policy_id", sa.String(length=36), nullable=True),
-        sa.Column("coverage_tier", sa.Enum("basic", "standard", "premium", name="coveragetier", create_type=False), nullable=False),
+        sa.Column(
+            "coverage_tier",
+            postgresql.ENUM("basic", "standard", "premium", name="coveragetier", create_type=False),
+            nullable=False,
+        ),
         sa.Column("amount", sa.Numeric(10, 2), nullable=False),
         sa.Column("currency", sa.String(length=8), nullable=False),
         sa.Column("razorpay_order_id", sa.String(length=100), nullable=False),

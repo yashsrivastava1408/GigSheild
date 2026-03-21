@@ -7,6 +7,7 @@ Create Date: 2026-03-11
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 revision = "20260311_0002"
@@ -15,7 +16,7 @@ branch_labels = None
 depends_on = None
 
 
-disruption_event_type_enum = sa.Enum(
+disruption_event_type_enum = postgresql.ENUM(
     "heavy_rain",
     "extreme_heat",
     "flood",
@@ -24,18 +25,24 @@ disruption_event_type_enum = sa.Enum(
     "outage",
     name="disruptioneventtype",
 )
-claim_status_enum = sa.Enum(
+claim_status_enum = postgresql.ENUM(
     "auto_approved",
     "manual_review",
     "rejected",
     "paid",
     name="claimstatus",
 )
-payout_status_enum = sa.Enum("pending", "processing", "completed", "failed", name="payoutstatus")
-payment_method_enum = sa.Enum("upi", "bank_transfer", name="paymentmethod")
+payout_status_enum = postgresql.ENUM("pending", "processing", "completed", "failed", name="payoutstatus", create_type=False)
+payment_method_enum = postgresql.ENUM("upi", "bank_transfer", name="paymentmethod", create_type=False)
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    disruption_event_type_enum.create(bind, checkfirst=True)
+    claim_status_enum.create(bind, checkfirst=True)
+    payout_status_enum.create(bind, checkfirst=True)
+    payment_method_enum.create(bind, checkfirst=True)
+
     op.create_table(
         "disruption_events",
         sa.Column("id", sa.String(length=36), primary_key=True),

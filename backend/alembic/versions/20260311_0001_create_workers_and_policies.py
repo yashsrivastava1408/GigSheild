@@ -7,6 +7,7 @@ Create Date: 2026-03-11
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 revision = "20260311_0001"
@@ -15,12 +16,17 @@ branch_labels = None
 depends_on = None
 
 
-platform_enum = sa.Enum("zomato", "swiggy", "zepto", "blinkit", name="platform")
-coverage_tier_enum = sa.Enum("basic", "standard", "premium", name="coveragetier")
-policy_status_enum = sa.Enum("active", "expired", "cancelled", name="policystatus")
+platform_enum = postgresql.ENUM("zomato", "swiggy", "zepto", "blinkit", name="platform", create_type=False)
+coverage_tier_enum = postgresql.ENUM("basic", "standard", "premium", name="coveragetier", create_type=False)
+policy_status_enum = postgresql.ENUM("active", "expired", "cancelled", name="policystatus", create_type=False)
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    platform_enum.create(bind, checkfirst=True)
+    coverage_tier_enum.create(bind, checkfirst=True)
+    policy_status_enum.create(bind, checkfirst=True)
+
     op.create_table(
         "workers",
         sa.Column("id", sa.String(length=36), primary_key=True),
