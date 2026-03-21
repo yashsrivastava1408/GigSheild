@@ -37,7 +37,7 @@ client = TestClient(app)
 
 
 def _admin_headers() -> dict[str, str]:
-    response = client.post("/api/v1/auth/admin/login", json={"admin_key": "dev-admin-key"})
+    response = client.post("/api/v1/auth/admin/login", json={"admin_key": settings.admin_api_key})
     token = response.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
