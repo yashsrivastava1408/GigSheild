@@ -14,8 +14,18 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.core.config import settings
 from app.db.init import Base
 
+
+def _normalize_database_url(value: str) -> str:
+    raw = value.strip()
+    if raw.startswith("postgres://"):
+        return raw.replace("postgres://", "postgresql+psycopg://", 1)
+    if raw.startswith("postgresql://"):
+        return raw.replace("postgresql://", "postgresql+psycopg://", 1)
+    return raw
+
+
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url.strip() or "sqlite:///./gigshield.db")
+config.set_main_option("sqlalchemy.url", _normalize_database_url(settings.database_url) or "sqlite:///./gigshield.db")
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
