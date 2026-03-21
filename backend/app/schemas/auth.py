@@ -19,6 +19,15 @@ class OtpVerifyRequest(BaseModel):
     otp_code: str = Field(pattern=r"^\d{6}$")
 
 
+class AdminLoginRequest(BaseModel):
+    admin_key: str = Field(min_length=8, max_length=255)
+
+
+class AdminLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
 class AuthSessionResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

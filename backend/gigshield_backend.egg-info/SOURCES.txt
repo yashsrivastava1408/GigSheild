@@ -6,6 +6,10 @@ gigshield_backend.egg-info/SOURCES.txt
 gigshield_backend.egg-info/dependency_links.txt
 gigshield_backend.egg-info/requires.txt
 gigshield_backend.egg-info/top_level.txt
+tests/test_auth_and_admin.py
+tests/test_claim_automation.py
 tests/test_health.py
+tests/test_plausibility_assessment.py
 tests/test_policy_flow.py
 tests/test_premium.py
+tests/test_trust_score.py

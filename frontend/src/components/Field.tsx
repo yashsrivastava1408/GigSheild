@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 
-export function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <label>
-      <span>{label}</span>
-      {children}
-    </label>
+    <div className={`form-field ${className}`}>
+      <span className="field-label">{label}</span>
+      <div className="field-control">
+        {children}
+      </div>
+    </div>
   );
 }

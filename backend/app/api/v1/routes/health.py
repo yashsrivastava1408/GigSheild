@@ -1,6 +1,6 @@
-from datetime import UTC, datetime
-
 from fastapi import APIRouter
+
+from app.core.time import utcnow
 
 
 router = APIRouter()
@@ -11,5 +11,5 @@ async def health_check() -> dict[str, str]:
     return {
         "status": "healthy",
         "service": "gigshield-backend",
-        "timestamp": datetime.now(UTC).isoformat(),
+        "timestamp": utcnow().isoformat(),
     }

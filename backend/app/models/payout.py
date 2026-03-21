@@ -1,8 +1,9 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.time import utcnow
 from app.db.base import Base
 from app.models.enums import PaymentMethod, PayoutStatus
 
@@ -16,10 +17,12 @@ class Payout(Base):
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     payment_method: Mapped[PaymentMethod] = mapped_column(Enum(PaymentMethod), nullable=False)
     razorpay_payment_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    idempotency_key: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
+    failure_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[PayoutStatus] = mapped_column(Enum(PayoutStatus), nullable=False)
     processed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(UTC),
+        default=utcnow,
         nullable=False,
     )
 

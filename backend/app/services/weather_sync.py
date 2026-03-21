@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.repositories.disruptions import get_matching_active_event
+from app.repositories.workers import list_distinct_worker_zone_ids
 from app.schemas.disruption import DisruptionEventCreateRequest
 from app.services.disruptions import create_event
 from app.services.providers import fetch_weather_signals
@@ -8,7 +9,7 @@ from app.services.providers import fetch_weather_signals
 
 def sync_weather_events(db: Session) -> list:
     created_events = []
-    for signal in fetch_weather_signals():
+    for signal in fetch_weather_signals(list_distinct_worker_zone_ids(db)):
         if get_matching_active_event(db, signal.zone_id, signal.event_type) is not None:
             continue
         created_events.append(

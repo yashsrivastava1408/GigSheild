@@ -6,8 +6,10 @@ export const FORM_KEY = "gigshield_form_state";
 export const TIER_KEY = "gigshield_selected_tier";
 export const PHONE_KEY = "gigshield_login_phone";
 export const ADMIN_KEY = "gigshield_admin_key";
+export const ADMIN_SESSION_KEY = "gigshield_admin_session";
 export const TAB_KEY = "gigshield_active_tab";
 export const INSTALL_DISMISSED_KEY = "gigshield_install_dismissed";
+export const DEVICE_FINGERPRINT_KEY = "gigshield_device_fingerprint";
 
 export const platformOptions: { value: Platform; label: string }[] = [
   { value: "zomato", label: "Zomato" },

@@ -1,12 +1,13 @@
 import hashlib
 import hmac
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.time import UTC, utcnow
 from app.db.session import get_db
 from app.repositories.auth import get_auth_session_by_token
 from app.repositories.workers import get_worker_by_id
@@ -23,6 +24,28 @@ def generate_session_token(worker_id: str) -> str:
     return f"{worker_id}.{nonce}.{signature}"
 
 
+def generate_admin_token() -> str:
+    nonce = secrets.token_urlsafe(24)
+    expires_at = int((utcnow() + timedelta(minutes=settings.admin_token_ttl_minutes)).timestamp())
+    payload = f"admin.{nonce}.{expires_at}".encode()
+    signature = hmac.new(settings.secret_key.encode(), payload, hashlib.sha256).hexdigest()
+    return f"admin.{nonce}.{expires_at}.{signature}"
+
+
+def verify_admin_token(token: str) -> bool:
+    try:
+        subject, nonce, expires_at_raw, signature = token.split(".", 3)
+    except ValueError:
+        return False
+    if subject != "admin":
+        return False
+    payload = f"{subject}.{nonce}.{expires_at_raw}".encode()
+    expected = hmac.new(settings.secret_key.encode(), payload, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected):
+        return False
+    return int(expires_at_raw) >= int(utcnow().timestamp())
+
+
 def verify_session_token(token: str) -> bool:
     try:
         worker_id, nonce, signature = token.split(".", 2)
@@ -34,11 +57,11 @@ def verify_session_token(token: str) -> bool:
 
 
 def access_token_expiry() -> datetime:
-    return datetime.now(UTC) + timedelta(minutes=settings.access_token_ttl_minutes)
+    return utcnow() + timedelta(minutes=settings.access_token_ttl_minutes)
 
 
 def otp_expiry() -> datetime:
-    return datetime.now(UTC) + timedelta(minutes=settings.otp_ttl_minutes)
+    return utcnow() + timedelta(minutes=settings.otp_ttl_minutes)
 
 
 def ensure_utc(value: datetime) -> datetime:
@@ -67,6 +90,11 @@ def get_current_worker(
     return worker
 
 
-def require_admin(x_admin_key: str | None = Header(default=None)) -> None:
-    if x_admin_key != settings.admin_api_key:
+def require_admin(
+    authorization: str | None = Header(default=None),
+) -> None:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing admin bearer token.")
+    token = authorization.replace("Bearer ", "", 1).strip()
+    if not verify_admin_token(token):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access denied.")

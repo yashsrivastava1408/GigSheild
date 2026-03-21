@@ -1,8 +1,9 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import DateTime, Enum, ForeignKey, JSON, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.time import utcnow
 from app.db.base import Base
 from app.models.enums import ClaimStatus
 
@@ -19,6 +20,6 @@ class FraudLog(Base):
     action_taken: Mapped[ClaimStatus] = mapped_column(Enum(ClaimStatus), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(UTC),
+        default=utcnow,
         nullable=False,
     )

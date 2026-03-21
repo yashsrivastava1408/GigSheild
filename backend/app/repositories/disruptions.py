@@ -1,8 +1,9 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.time import utcnow
 from app.models.disruption_event import DisruptionEvent
 from app.models.enums import DisruptionEventType
 
@@ -19,7 +20,7 @@ def get_disruption_event_by_id(db: Session, event_id: str) -> DisruptionEvent | 
 
 
 def list_active_disruptions(db: Session, as_of: datetime | None = None) -> list[DisruptionEvent]:
-    moment = as_of or datetime.now(UTC)
+    moment = as_of or utcnow()
     statement = select(DisruptionEvent).where(
         DisruptionEvent.started_at <= moment,
         (DisruptionEvent.ended_at.is_(None)) | (DisruptionEvent.ended_at >= moment),
@@ -33,7 +34,7 @@ def get_matching_active_event(
     event_type: DisruptionEventType,
     as_of: datetime | None = None,
 ) -> DisruptionEvent | None:
-    moment = as_of or datetime.now(UTC)
+    moment = as_of or utcnow()
     statement = select(DisruptionEvent).where(
         DisruptionEvent.zone_id == zone_id,
         DisruptionEvent.event_type == event_type,

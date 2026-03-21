@@ -1,8 +1,9 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.time import utcnow
 from app.db.base import Base
 from app.models.enums import ClaimStatus
 
@@ -24,7 +25,7 @@ class Claim(Base):
     trust_score_at_claim: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(UTC),
+        default=utcnow,
         nullable=False,
     )
 
@@ -32,3 +33,4 @@ class Claim(Base):
     worker = relationship("Worker", back_populates="claims")
     disruption_event = relationship("DisruptionEvent", back_populates="claims")
     payout = relationship("Payout", back_populates="claim", uselist=False)
+    plausibility_assessment = relationship("PlausibilityAssessment", back_populates="claim", uselist=False)

@@ -1,22 +1,31 @@
 import { startTransition, useEffect, useMemo, useState } from "react";
+import { Toaster, toast } from "sonner";
 
 import {
+  adminLogin,
   approveAdminClaim,
+  approveAdminPayoutProfile,
+  type AdminPayoutProfile,
+  createPolicyCheckout,
   createPolicy,
   DEFAULT_ADMIN_KEY,
   expirePolicies,
   getCurrentWorker,
   getPremiumQuote,
   listAdminClaims,
+  listAdminPayoutProfiles,
   listClaims,
   listDisruptions,
   listFraudLogs,
+  listPlausibilityAssessments,
   listPolicies,
   listPayouts,
   rejectAdminClaim,
+  rejectAdminPayoutProfile,
   registerWorker,
   requestOtp,
   syncWeather,
+  updatePayoutProfile,
   verifyOtp,
   type AdminOpsPolicyExpiryResult,
   type AdminOpsWeatherSyncResult,
@@ -24,6 +33,7 @@ import {
   type CoverageTier,
   type DisruptionEvent,
   type FraudLog,
+  type PlausibilityAssessment,
   type Policy,
   type Payout,
   type QuoteResponse,
@@ -31,9 +41,11 @@ import {
 } from "./lib/api";
 import {
   ADMIN_KEY,
+  ADMIN_SESSION_KEY,
   DASHBOARD_CACHE_KEY,
   FORM_KEY,
   INSTALL_DISMISSED_KEY,
+  DEVICE_FINGERPRINT_KEY,
   PHONE_KEY,
   SESSION_KEY,
   TAB_KEY,
@@ -63,9 +75,31 @@ type BeforeInstallPromptEvent = Event & {
 };
 
 type AppRoute = "worker" | "admin";
+type RazorpaySuccessResponse = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayWindow = Window & {
+  Razorpay?: new (options: Record<string, unknown>) => {
+    open: () => void;
+  };
+};
 
 function getRouteFromPath(pathname: string): AppRoute {
   return pathname.startsWith("/admin") ? "admin" : "worker";
+}
+
+function getDeviceFingerprint(): string {
+  const stored = localStorage.getItem(DEVICE_FINGERPRINT_KEY);
+  if (stored) {
+    return stored;
+  }
+
+  const fingerprint = `gigshield-${crypto.randomUUID()}`;
+  localStorage.setItem(DEVICE_FINGERPRINT_KEY, fingerprint);
+  return fingerprint;
 }
 
 export default function App() {
@@ -83,8 +117,11 @@ export default function App() {
   const [mockOtpHint, setMockOtpHint] = useState<string | null>(null);
   const [loginPhone, setLoginPhone] = usePersistentState<string>(PHONE_KEY, "");
   const [adminKey, setAdminKey] = usePersistentState<string>(ADMIN_KEY, DEFAULT_ADMIN_KEY);
+  const [adminToken, setAdminToken] = usePersistentState<string>(ADMIN_SESSION_KEY, "");
   const [adminClaims, setAdminClaims] = useState<Claim[]>([]);
   const [fraudLogs, setFraudLogs] = useState<FraudLog[]>([]);
+  const [payoutProfiles, setPayoutProfiles] = useState<AdminPayoutProfile[]>([]);
+  const [plausibilityAssessments, setPlausibilityAssessments] = useState<PlausibilityAssessment[]>([]);
   const [latestWeatherSync, setLatestWeatherSync] = useState<AdminOpsWeatherSyncResult[] | null>(null);
   const [latestPolicyExpiry, setLatestPolicyExpiry] = useState<AdminOpsPolicyExpiryResult | null>(null);
   const [activeTab, setActiveTab] = usePersistentState<"overview" | "history">(TAB_KEY, "overview");
@@ -92,8 +129,14 @@ export default function App() {
   const [status, setStatus] = useState(
     "Cover every working week with fast onboarding, simple pricing, and payout support when disruption hits.",
   );
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  
+  const setError = (msg: string | null) => {
+    if (msg) toast.error(msg);
+  };
+  
+  const setNotice = (msg: string | null) => {
+    if (msg) toast.success(msg);
+  };
   const [isBooting, setIsBooting] = useState(true);
   const [isRequestingOtp, setIsRequestingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
@@ -103,6 +146,7 @@ export default function App() {
   const [isLoadingAdmin, setIsLoadingAdmin] = useState(false);
   const [isRunningWeatherSync, setIsRunningWeatherSync] = useState(false);
   const [isRunningPolicyExpiry, setIsRunningPolicyExpiry] = useState(false);
+  const [isSavingPayoutProfile, setIsSavingPayoutProfile] = useState(false);
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallDismissed, setIsInstallDismissed] = usePersistentState<boolean>(INSTALL_DISMISSED_KEY, false);
   const [isAdminPromptOpen, setIsAdminPromptOpen] = useState(false);
@@ -208,13 +252,7 @@ export default function App() {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [worker]);
 
-  useEffect(() => {
-    if (!notice) {
-      return;
-    }
-    const timeout = window.setTimeout(() => setNotice(null), 2600);
-    return () => window.clearTimeout(timeout);
-  }, [notice]);
+
 
   useEffect(() => {
     localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({ worker, policies, claims, payouts, disruptions }));
@@ -272,19 +310,40 @@ export default function App() {
     });
   }
 
-  async function loadAdminPanel(adminSecret = adminKey) {
+  async function ensureAdminToken(adminSecret = adminKey) {
     if (!adminSecret.trim()) {
       setError("Enter the admin API key to load the review queue.");
+      return null;
+    }
+    if (adminToken) {
+      return adminToken;
+    }
+    const session = await adminLogin(adminSecret);
+    setAdminToken(session.access_token);
+    return session.access_token;
+  }
+
+  async function loadAdminPanel(adminSecret = adminKey) {
+    const tokenValue = await ensureAdminToken(adminSecret);
+    if (!tokenValue) {
       return;
     }
 
     setError(null);
     setIsLoadingAdmin(true);
     try {
-      const [claimsFeed, fraudFeed] = await Promise.all([listAdminClaims(adminSecret), listFraudLogs(adminSecret)]);
+      const [claimsFeed, fraudFeed, assessmentFeed, payoutProfileFeed] = await Promise.all([
+        listAdminClaims(tokenValue),
+        listFraudLogs(tokenValue),
+        listPlausibilityAssessments(tokenValue),
+        listAdminPayoutProfiles(tokenValue),
+      ]);
       setAdminClaims(claimsFeed);
       setFraudLogs(fraudFeed);
+      setPlausibilityAssessments(assessmentFeed);
+      setPayoutProfiles(payoutProfileFeed);
     } catch (requestError) {
+      setAdminToken("");
       setError(requestError instanceof Error ? requestError.message : "Could not load admin data.");
     } finally {
       setIsLoadingAdmin(false);
@@ -292,15 +351,15 @@ export default function App() {
   }
 
   async function handleSyncWeather() {
-    if (!adminKey.trim()) {
-      setError("Enter the admin API key to run weather sync.");
+    const tokenValue = await ensureAdminToken();
+    if (!tokenValue) {
       return;
     }
 
     setError(null);
     setIsRunningWeatherSync(true);
     try {
-      const createdEvents = await syncWeather(adminKey);
+      const createdEvents = await syncWeather(tokenValue);
       setLatestWeatherSync(createdEvents);
       setDisruptions(await listDisruptions());
       setNotice(
@@ -316,15 +375,15 @@ export default function App() {
   }
 
   async function handleExpirePolicies() {
-    if (!adminKey.trim()) {
-      setError("Enter the admin API key to expire policies.");
+    const tokenValue = await ensureAdminToken();
+    if (!tokenValue) {
       return;
     }
 
     setError(null);
     setIsRunningPolicyExpiry(true);
     try {
-      const result = await expirePolicies(adminKey);
+      const result = await expirePolicies(tokenValue);
       setLatestPolicyExpiry(result);
       if (worker) {
         await loadDashboard(worker.id);
@@ -381,6 +440,7 @@ export default function App() {
         phone: form.phone,
         platform: form.platform,
         zone_id: form.zoneId,
+        device_fingerprint: getDeviceFingerprint(),
         avg_weekly_earnings: Number(form.avgWeeklyEarnings),
         tenure_days: Number(form.tenureDays),
         kyc_verified: form.kycVerified,
@@ -484,7 +544,49 @@ export default function App() {
     setError(null);
     setIsBuying(true);
     try {
-      const policy = await createPolicy(worker.id, selectedTier);
+      const checkout = await createPolicyCheckout(worker.id, selectedTier);
+      let payment:
+        | {
+            razorpay_order_id: string;
+            razorpay_payment_id: string;
+            razorpay_signature: string;
+          }
+        | undefined;
+
+      if (checkout.checkout_required) {
+        const Razorpay = (window as RazorpayWindow).Razorpay;
+        if (!Razorpay) {
+          throw new Error("Razorpay Checkout SDK did not load.");
+        }
+
+        payment = await new Promise<RazorpaySuccessResponse>((resolve, reject) => {
+          const instance = new Razorpay({
+            key: checkout.key_id,
+            amount: checkout.amount,
+            currency: checkout.currency,
+            name: "GigShield",
+            description: `Weekly ${selectedTier} cover`,
+            order_id: checkout.order_id,
+            handler: (response: unknown) => resolve(response as RazorpaySuccessResponse),
+            modal: {
+              ondismiss: () => reject(new Error("Razorpay checkout was cancelled.")),
+            },
+            prefill: {
+              name: worker.name,
+              contact: worker.phone,
+            },
+            notes: {
+              token: checkout.notes_token,
+            },
+            theme: {
+              color: "#ff6a2a",
+            },
+          });
+          instance.open();
+        });
+      }
+
+      const policy = await createPolicy(worker.id, selectedTier, payment);
       await loadDashboard(worker.id);
       setStatus(`Policy activated. ${formatCurrency(policy.coverage_amount)} cover is active until ${policy.end_date}.`);
       setNotice("Weekly policy activated.");
@@ -503,6 +605,7 @@ export default function App() {
     setPolicies([]);
     setClaims([]);
     setPayouts([]);
+    setPlausibilityAssessments([]);
     setQuote(null);
     setOtpCode("");
     setMockOtpHint(null);
@@ -538,7 +641,11 @@ export default function App() {
   }
 
   async function handleApproveClaim(claimId: string) {
-    await approveAdminClaim(claimId, adminKey);
+    const tokenValue = await ensureAdminToken();
+    if (!tokenValue) {
+      return;
+    }
+    await approveAdminClaim(claimId, tokenValue);
     setNotice("Claim approved.");
     await loadAdminPanel();
   }
@@ -550,6 +657,7 @@ export default function App() {
       return;
     }
     setAdminKey(trimmed);
+    setAdminToken("");
     setIsAdminPromptOpen(false);
     void loadAdminPanel(trimmed);
   }
@@ -560,9 +668,59 @@ export default function App() {
   }
 
   async function handleRejectClaim(claimId: string) {
-    await rejectAdminClaim(claimId, adminKey);
+    const tokenValue = await ensureAdminToken();
+    if (!tokenValue) {
+      return;
+    }
+    await rejectAdminClaim(claimId, tokenValue);
     setNotice("Claim rejected.");
     await loadAdminPanel();
+  }
+
+  async function handleApprovePayoutProfile(workerId: string) {
+    const tokenValue = await ensureAdminToken();
+    if (!tokenValue) {
+      return;
+    }
+    await approveAdminPayoutProfile(workerId, tokenValue);
+    setNotice("Payout profile approved.");
+    await loadAdminPanel();
+  }
+
+  async function handleRejectPayoutProfile(workerId: string) {
+    const tokenValue = await ensureAdminToken();
+    if (!tokenValue) {
+      return;
+    }
+    await rejectAdminPayoutProfile(workerId, tokenValue);
+    setNotice("Payout profile rejected.");
+    await loadAdminPanel();
+  }
+
+  async function handleSavePayoutProfile(payload: {
+    payout_method: "upi" | "bank_transfer";
+    payout_upi_id?: string | null;
+    payout_bank_account_name?: string | null;
+    payout_bank_account_number?: string | null;
+    payout_bank_ifsc?: string | null;
+    payout_contact_name: string;
+    payout_contact_phone: string;
+  }) {
+    if (!token || !worker) {
+      setError("Log in to save payout details.");
+      return;
+    }
+    setError(null);
+    setIsSavingPayoutProfile(true);
+    try {
+      const updatedWorker = await updatePayoutProfile(token, payload);
+      setWorker(updatedWorker);
+      setNotice("Payout profile submitted for review.");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Could not save payout profile.");
+    } finally {
+      setIsSavingPayoutProfile(false);
+    }
   }
 
   if (isBooting) {
@@ -575,15 +733,16 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      {notice ? <div className="notice-toast">{notice}</div> : null}
-      {error ? <p className="inline-error global-error">{error}</p> : null}
+      <Toaster theme="dark" position="top-center" richColors />
 
       {route === "admin" ? (
-        <AdminConsole
+      <AdminConsole
           adminKey={adminKey}
           setAdminKey={setAdminKey}
           adminClaims={adminClaims}
           fraudLogs={fraudLogs}
+          payoutProfiles={payoutProfiles}
+          plausibilityAssessments={plausibilityAssessments}
           latestWeatherSync={latestWeatherSync}
           latestPolicyExpiry={latestPolicyExpiry}
           isLoadingAdmin={isLoadingAdmin}
@@ -593,8 +752,14 @@ export default function App() {
           onSyncWeather={() => void handleSyncWeather()}
           onExpirePolicies={() => void handleExpirePolicies()}
           onApproveClaim={(claimId) => void handleApproveClaim(claimId)}
+          onApprovePayoutProfile={(workerId) => void handleApprovePayoutProfile(workerId)}
           onRejectClaim={(claimId) => void handleRejectClaim(claimId)}
+          onRejectPayoutProfile={(id) => void handleRejectPayoutProfile(id)}
           onGoWorker={() => navigateTo("worker")}
+          onAutoLoadDemo={() => {
+            setAdminKey("ADMIN_API_KEY");
+            void loadAdminPanel("ADMIN_API_KEY");
+          }}
         />
       ) : !token || !worker ? (
         <AuthFlow
@@ -633,8 +798,6 @@ export default function App() {
             worker={worker}
             selectedTier={selectedTier}
             setSelectedTier={setSelectedTier}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
             quote={quote}
             policies={policies}
             claims={claims}
@@ -642,8 +805,10 @@ export default function App() {
             disruptions={disruptions}
             isFetchingQuote={isFetchingQuote}
             isBuying={isBuying}
+            isSavingPayoutProfile={isSavingPayoutProfile}
             onQuote={() => void handleQuote()}
             onBuy={() => void handleBuyPolicy()}
+            onSavePayoutProfile={(payload) => void handleSavePayoutProfile(payload)}
             onLogout={logout}
             onRefresh={() => void loadDashboard(worker.id)}
           />
@@ -662,13 +827,28 @@ export default function App() {
               onChange={(event) => setAdminPromptValue(event.target.value)}
               placeholder="Paste ADMIN_API_KEY"
             />
-            <div className="action-row top-gap">
-              <button className="secondary-action" type="button" onClick={handleAdminPromptClose}>
-                Cancel
+            <div className="action-row flex-between top-gap">
+              <button 
+                className="ghost-action text-teal" 
+                type="button" 
+                onClick={() => {
+                  setAdminPromptValue("ADMIN_API_KEY");
+                  setAdminKey("ADMIN_API_KEY");
+                  setAdminToken("");
+                  setIsAdminPromptOpen(false);
+                  void loadAdminPanel("ADMIN_API_KEY");
+                }}
+              >
+                Auto-fill Demo Key
               </button>
-              <button className="primary-action" type="submit">
-                Unlock admin
-              </button>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button className="secondary-action" type="button" onClick={handleAdminPromptClose}>
+                  Cancel
+                </button>
+                <button className="primary-action" type="submit">
+                  Unlock admin
+                </button>
+              </div>
             </div>
           </form>
         </div>

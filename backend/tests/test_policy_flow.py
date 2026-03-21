@@ -5,9 +5,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
+
+
+settings.use_mock_payouts = True
 
 
 engine = create_engine(
@@ -89,3 +93,28 @@ def test_duplicate_active_policy_is_rejected() -> None:
         json={"worker_id": worker_id, "coverage_tier": "premium"},
     )
     assert duplicate_policy.status_code == 409
+
+
+def test_policy_checkout_endpoint_returns_mock_mode_payload() -> None:
+    register_response = client.post(
+        "/api/v1/workers/register",
+        json={
+            "phone": "9234567890",
+            "name": "Leela",
+            "platform": "zepto",
+            "zone_id": "delhi_zone_7",
+            "avg_weekly_earnings": 4300,
+            "tenure_days": 180,
+            "kyc_verified": True,
+        },
+    )
+    worker_id = register_response.json()["id"]
+
+    checkout_response = client.post(
+        "/api/v1/policies/checkout",
+        json={"worker_id": worker_id, "coverage_tier": "basic"},
+    )
+    assert checkout_response.status_code == 200
+    body = checkout_response.json()
+    assert body["currency"] == "INR"
+    assert body["amount"] > 0

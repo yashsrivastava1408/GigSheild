@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -19,6 +21,20 @@ def get_latest_active_otp(db: Session, phone: str) -> OtpChallenge | None:
         .order_by(OtpChallenge.created_at.desc())
     )
     return db.scalar(statement)
+
+
+def count_recent_otp_requests(db: Session, phone: str, since: datetime) -> int:
+    statement = select(OtpChallenge).where(OtpChallenge.phone == phone, OtpChallenge.created_at >= since)
+    return len(list(db.scalars(statement)))
+
+
+def increment_otp_attempts(db: Session, challenge: OtpChallenge) -> OtpChallenge:
+    challenge.attempt_count += 1
+    if challenge.attempt_count >= 1:
+        db.add(challenge)
+        db.commit()
+        db.refresh(challenge)
+    return challenge
 
 
 def mark_otp_consumed(db: Session, challenge: OtpChallenge) -> OtpChallenge:

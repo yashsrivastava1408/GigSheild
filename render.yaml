@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: gigshield-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -e .
+    startCommand: bash render-start.sh
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: API_V1_PREFIX
+        value: /api/v1
+      - key: USE_MOCK_SMS
+        value: "true"
+      - key: USE_MOCK_WEATHER
+        value: "true"
+      - key: USE_MOCK_PAYOUTS
+        value: "true"
+      - key: RAZORPAY_KEY_ID
+        value: ""
+      - key: RAZORPAY_KEY_SECRET
+        value: ""
+      - key: RAZORPAY_WEBHOOK_SECRET
+        value: ""
+      - key: RAZORPAYX_SOURCE_ACCOUNT_NUMBER
+        value: ""

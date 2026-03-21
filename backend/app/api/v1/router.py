@@ -6,6 +6,7 @@ from app.api.v1.routes import claims
 from app.api.v1.routes import disruptions
 from app.api.v1.routes import health
 from app.api.v1.routes import internal
+from app.api.v1.routes import payments
 from app.api.v1.routes import policies
 from app.api.v1.routes import premium
 from app.api.v1.routes import workers
@@ -21,3 +22,4 @@ api_router.include_router(disruptions.router, prefix="/disruptions", tags=["disr
 api_router.include_router(claims.router, prefix="/claims", tags=["claims"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(internal.router, prefix="/internal", tags=["internal"])
+api_router.include_router(payments.router, prefix="/payments", tags=["payments"])

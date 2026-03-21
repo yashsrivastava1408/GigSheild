@@ -1,8 +1,9 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
 from app.core.security import ensure_utc
+from app.core.time import utcnow
 from app.models.enums import ClaimStatus
 from app.models.worker import Worker
 from app.repositories.claims import list_claims_for_worker
@@ -76,7 +77,7 @@ def compute_trust_score(
 
 
 def recompute_trust_score(db: Session, worker: Worker, now: datetime | None = None) -> Worker:
-    reference_time = now or datetime.now(UTC)
+    reference_time = now or utcnow()
     claims = list_claims_for_worker(db, worker.id)
     fraud_logs = list_fraud_logs_for_worker(db, worker.id)
     policies = list_policies_for_worker(db, worker.id)

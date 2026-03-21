@@ -1,3 +1,17 @@
+import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { 
+  Shield, 
+  User, 
+  Smartphone, 
+  ArrowRight, 
+  ArrowLeft, 
+  CheckCircle2, 
+  MapPin, 
+  Wallet,
+  Building2,
+  Clock,
+  Briefcase
+} from "lucide-react";
 import type { Platform } from "../lib/api";
 import { cityZones, platformOptions } from "../lib/constants";
 import { Field } from "./Field";
@@ -14,6 +28,18 @@ export type FormState = {
 };
 
 export type AuthStage = "phone" | "profile" | "otp";
+
+const containerVariants: Variants = {
+  initial: { opacity: 0, scale: 0.95, y: 20 },
+  animate: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+  exit: { opacity: 0, scale: 1.05, y: -20, transition: { duration: 0.4 } }
+};
+
+const stepVariants: Variants = {
+  initial: { opacity: 0, x: 20 },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+  exit: { opacity: 0, x: -20, transition: { duration: 0.3 } }
+};
 
 export function AuthFlow({
   stage,
@@ -57,195 +83,316 @@ export function AuthFlow({
       <div className="bg-atmosphere">
         <div className="blob blob-1" />
         <div className="blob blob-2" />
-        <div className="blob blob-3" />
-        <svg className="shield-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        </svg>
+        <motion.div 
+          className="shield-bg"
+          initial={{ opacity: 0, rotate: -10 }}
+          animate={{ opacity: 0.05, rotate: 0 }}
+          transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+        >
+          <Shield size={600} strokeWidth={0.5} />
+        </motion.div>
       </div>
 
       <section className="auth-shell">
-        <div className="auth-container">
+        <motion.div 
+          className="auth-container"
+          variants={containerVariants}
+          initial="initial"
+          animate="animate"
+          layout
+        >
           <div className="auth-visual-side">
-            <div className="brand-logo">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M12 8v4M12 16h.01" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
+            <motion.div 
+              className="brand-logo"
+              whileHover={{ rotate: 10, scale: 1.1 }}
+            >
+              <div className="logo-icon">
+                <Shield size={32} className="text-accent" />
+                <div className="logo-sparkle" />
+              </div>
+            </motion.div>
             
             <div className="auth-visual-content">
-              <p className="eyebrow">GigShield 2.0</p>
-              <h2>Empowering the next billion earners.</h2>
-              <p>Join the only parametric micro-insurance built for the freedom and flexibility of Indian gig workers.</p>
+              <motion.p 
+                className="eyebrow"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                GigShield 2.0
+              </motion.p>
+              <motion.h2
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                Empowering the next billion earners.
+              </motion.h2>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+              >
+                Join the only parametric micro-insurance built for the freedom and flexibility of Indian gig workers.
+              </motion.p>
             </div>
 
             <div className="auth-visual-footer">
-              <div className="trust-stat">
-                <strong>15k+</strong>
-                <span>Workers Covered</span>
-              </div>
-              <div className="trust-stat">
-                <strong>₹ 40L+</strong>
-                <span>Claims Settled</span>
-              </div>
+              <motion.div className="trust-stat" whileHover={{ y: -5 }}>
+                <div className="stat-icon"><User size={20} /></div>
+                <div>
+                  <strong>15k+</strong>
+                  <span>Workers Covered</span>
+                </div>
+              </motion.div>
+              <motion.div className="trust-stat" whileHover={{ y: -5 }}>
+                <div className="stat-icon"><CheckCircle2 size={20} /></div>
+                <div>
+                  <strong>₹ 40L+</strong>
+                  <span>Claims Settled</span>
+                </div>
+              </motion.div>
             </div>
           </div>
 
           <div className="auth-form-side">
-            {stage === "phone" ? (
-              <div className="flow-step">
-                <div className="form-header">
-                  <h3>Get Started</h3>
-                  <p className="flow-copy">Welcome to the future of financial safety. Enter your number to continue.</p>
-                </div>
+            <AnimatePresence mode="wait">
+              {stage === "phone" && (
+                <motion.div 
+                  key="phone"
+                  className="flow-step"
+                  variants={stepVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                >
+                  <div className="form-header">
+                    <h3>Get Started</h3>
+                    <p className="flow-copy">Welcome to the future of financial safety. Enter your number to continue.</p>
+                  </div>
 
-                <div className="input-container">
-                  <Field label="Phone number">
-                    <div className="input-wrapper">
-                      <span className="input-icon">🇮🇳</span>
+                  <div className="input-container">
+                    <Field label="Phone number">
+                      <div className="input-field-wrapper">
+                        <Smartphone size={20} className="input-icon-lucide" />
+                        <input
+                          className="premium-input-new"
+                          value={loginPhone}
+                          onChange={(event) => setLoginPhone(event.target.value.replace(/\D/g, "").slice(0, 10))}
+                          placeholder="9876543210"
+                          autoFocus
+                          type="tel"
+                        />
+                      </div>
+                    </Field>
+                  </div>
+
+                  <div className="flow-actions mt-lg">
+                    <motion.button 
+                      className="primary-action full-width glossy"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={onStartLogin} 
+                      disabled={isRequestingOtp}
+                    >
+                      {isRequestingOtp ? (
+                        <span className="flex-center gap-sm">
+                          <div className="spinner-small" /> Securing Session...
+                        </span>
+                      ) : (
+                        <span className="flex-center gap-sm">
+                          Secure Login <ArrowRight size={18} />
+                        </span>
+                      )}
+                    </motion.button>
+                  </div>
+                </motion.div>
+              )}
+
+              {stage === "profile" && (
+                <motion.div 
+                  key="profile"
+                  className="flow-step"
+                  variants={stepVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                >
+                  <div className="form-header">
+                    <h3>Build Your Profile</h3>
+                    <p className="flow-copy">Calibrating protection rates for your specific work profile.</p>
+                  </div>
+
+                  <div className="platform-grid-new">
+                    {platformOptions.map((option) => (
+                      <motion.button
+                        key={option.value}
+                        type="button"
+                        className={`platform-pill ${form.platform === option.value ? "active" : ""}`}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setForm((current) => ({ ...current, platform: option.value }))}
+                      >
+                        <Building2 size={16} />
+                        <span>{option.label}</span>
+                      </motion.button>
+                    ))}
+                  </div>
+
+                  <div className="field-grid">
+                    <Field label="Full Name">
+                      <div className="input-field-wrapper">
+                        <User size={18} className="input-icon-lucide" />
+                        <input
+                          value={form.name}
+                          onChange={(event) => setForm({ ...form, name: event.target.value })}
+                          placeholder="e.g. Rahul Verma"
+                        />
+                      </div>
+                    </Field>
+                    <Field label="City">
+                      <div className="input-field-wrapper">
+                        <MapPin size={18} className="input-icon-lucide" />
+                        <select
+                          value={form.city}
+                          onChange={(event) =>
+                            setForm({
+                              ...form,
+                              city: event.target.value as keyof typeof cityZones,
+                              zoneId: cityZones[event.target.value as keyof typeof cityZones][0].value,
+                            })
+                          }
+                        >
+                          {Object.keys(cityZones).map((city) => (
+                            <option key={city}>{city}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </Field>
+                    <Field label="Zone">
+                      <div className="input-field-wrapper">
+                        <MapPin size={18} className="input-icon-lucide" />
+                        <select value={form.zoneId} onChange={(event) => setForm({ ...form, zoneId: event.target.value })}>
+                          {currentZones.map((zone) => (
+                            <option key={zone.value} value={zone.value}>
+                              {zone.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </Field>
+                    <Field label="Weekly Earnings">
+                      <div className="input-field-wrapper">
+                        <Wallet size={18} className="input-icon-lucide" />
+                        <input
+                          value={form.avgWeeklyEarnings}
+                          onChange={(event) => setForm({ ...form, avgWeeklyEarnings: event.target.value.replace(/[^\d.]/g, "") })}
+                          placeholder="₹ 3,500"
+                        />
+                      </div>
+                    </Field>
+                  </div>
+
+                  <motion.label 
+                    className="premium-checkbox"
+                    whileHover={{ x: 5 }}
+                  >
+                    <div className="checkbox-wrapper">
                       <input
-                        className="premium-input"
-                        value={loginPhone}
-                        onChange={(event) => setLoginPhone(event.target.value.replace(/\D/g, "").slice(0, 10))}
-                        placeholder="9876543210"
+                        type="checkbox"
+                        checked={form.kycVerified}
+                        onChange={(event) => setForm({ ...form, kycVerified: event.target.checked })}
+                      />
+                      <div className="checkbox-visual"><CheckCircle2 size={14} /></div>
+                    </div>
+                    <span>KYC verified via {form.platform} platform</span>
+                  </motion.label>
+
+                  <div className="flow-actions mt-lg">
+                    <motion.button 
+                      className="secondary-action-new" 
+                      whileHover={{ scale: 1.05 }}
+                      onClick={onBack}
+                    >
+                      <ArrowLeft size={18} />
+                    </motion.button>
+                    <motion.button 
+                      className="primary-action flex-1 glossy" 
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={onRegister} 
+                      disabled={isRegistering}
+                    >
+                      {isRegistering ? "Saving..." : "Create Profile"}
+                    </motion.button>
+                  </div>
+                </motion.div>
+              )}
+
+              {stage === "otp" && (
+                <motion.div 
+                  key="otp"
+                  className="flow-step"
+                  variants={stepVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                >
+                  <div className="form-header">
+                    <h3>Verify Identity</h3>
+                    <p className="flow-copy">Enter the security code sent to <strong>+91 {loginPhone}</strong></p>
+                  </div>
+
+                  <Field label="Security Code">
+                    <div className="otp-input-container">
+                      <input
+                        className="otp-field-new"
+                        value={otpCode}
+                        onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                        placeholder="0 0 0 0 0 0"
                         autoFocus
                       />
+                      <div className="otp-glow" />
                     </div>
                   </Field>
-                </div>
 
-                <div className="flow-actions mt-lg">
-                  <button className="primary-action full-width" type="button" onClick={onStartLogin} disabled={isRequestingOtp}>
-                    {isRequestingOtp ? "Securing Session..." : "Secure Login →"}
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            {stage === "profile" ? (
-              <div className="flow-step">
-                <div className="form-header">
-                  <h3>Build Your Profile</h3>
-                  <p className="flow-copy">We use these details to calibrate your protection rates in real-time.</p>
-                </div>
-
-                <div className="platform-row">
-                  {platformOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`platform-chip ${form.platform === option.value ? "is-active" : ""}`}
-                      onClick={() => setForm((current) => ({ ...current, platform: option.value }))}
+                  {mockOtpHint && import.meta.env.VITE_API_BASE_URL?.includes("localhost") && (
+                    <motion.div 
+                      className="hint-banner"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
                     >
-                      <span>{option.label}</span>
-                      <small>Work platform</small>
-                    </button>
-                  ))}
-                </div>
+                      <Clock size={14} />
+                      <span>Development Bypass Code: <strong>{mockOtpHint}</strong></span>
+                    </motion.div>
+                  )}
 
-                <div className="field-grid">
-                  <Field label="Full Name">
-                    <input
-                      value={form.name}
-                      onChange={(event) => setForm({ ...form, name: event.target.value })}
-                      placeholder="e.g. Rahul Verma"
-                    />
-                  </Field>
-                  <Field label="City">
-                    <select
-                      value={form.city}
-                      onChange={(event) =>
-                        setForm({
-                          ...form,
-                          city: event.target.value as keyof typeof cityZones,
-                          zoneId: cityZones[event.target.value as keyof typeof cityZones][0].value,
-                        })
-                      }
+                  <div className="flow-actions mt-lg">
+                    <motion.button 
+                      className="primary-action full-width glossy" 
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={onVerifyOtp} 
+                      disabled={isVerifyingOtp}
                     >
-                      {Object.keys(cityZones).map((city) => (
-                        <option key={city}>{city}</option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Zone">
-                    <select value={form.zoneId} onChange={(event) => setForm({ ...form, zoneId: event.target.value })}>
-                      {currentZones.map((zone) => (
-                        <option key={zone.value} value={zone.value}>
-                          {zone.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Weekly Earnings">
-                    <input
-                      value={form.avgWeeklyEarnings}
-                      onChange={(event) => setForm({ ...form, avgWeeklyEarnings: event.target.value.replace(/[^\d.]/g, "") })}
-                      placeholder="₹ 3,500"
-                    />
-                  </Field>
-                </div>
-
-                <label className="toggle-row">
-                  <input
-                    type="checkbox"
-                    checked={form.kycVerified}
-                    onChange={(event) => setForm({ ...form, kycVerified: event.target.checked })}
-                  />
-                  <span>KYC verified via {form.platform} platform</span>
-                </label>
-
-                <div className="flow-actions mt-lg">
-                  <button className="secondary-action" type="button" onClick={onBack}>
-                    Back
-                  </button>
-                  <button className="primary-action flex-1" type="button" onClick={onRegister} disabled={isRegistering}>
-                    {isRegistering ? "Saving..." : "Create Profile"}
-                  </button>
-                </div>
-              </div>
-            ) : null}
-
-            {stage === "otp" ? (
-              <div className="flow-step">
-                <div className="form-header">
-                  <h3>Verify Account</h3>
-                  <p className="flow-copy">We've sent a 6-digit access code to your phone.</p>
-                </div>
-
-                <Field label="OTP Access Code">
-                  <input
-                    className="otp-box-custom"
-                    value={otpCode}
-                    onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="0 0 0 0 0 0"
-                    autoFocus
-                  />
-                </Field>
-
-                {mockOtpHint && import.meta.env.VITE_API_BASE_URL?.includes("localhost") ? (
-                  <div className="mock-hint-pill">
-                    Demo Code: <code>{mockOtpHint}</code>
+                      {isVerifyingOtp ? "Validating..." : "Enter Workspace"}
+                    </motion.button>
                   </div>
-                ) : null}
 
-                <div className="flow-actions mt-lg">
-                  <button className="primary-action full-width" type="button" onClick={onVerifyOtp} disabled={isVerifyingOtp}>
-                    {isVerifyingOtp ? "Validating..." : "Enter Dashboard"}
-                  </button>
-                </div>
-
-                <div className="otp-meta-actions">
-                  <button className="link-action" type="button" onClick={onRequestOtp} disabled={isRequestingOtp}>
-                    {isRequestingOtp ? "Sending..." : "Resend OTP"}
-                  </button>
-                  <button className="link-action" type="button" onClick={onBack}>
-                    Change phone number
-                  </button>
-                </div>
-              </div>
-            ) : null}
+                  <div className="otp-footer-links">
+                    <button className="text-link" type="button" onClick={onRequestOtp} disabled={isRequestingOtp}>
+                      {isRequestingOtp ? "Sending..." : "Resend Code"}
+                    </button>
+                    <div className="dot-divider" />
+                    <button className="text-link" type="button" onClick={onBack}>
+                      Change Number
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
       </section>
     </>
   );

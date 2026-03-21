@@ -1,15 +1,19 @@
 from collections.abc import Generator
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.services.trust import compute_trust_score
+
+
+settings.use_mock_payouts = True
 
 
 engine = create_engine(
@@ -90,7 +94,7 @@ def test_manual_review_claim_recomputes_trust_score() -> None:
             "event_type": "heavy_rain",
             "zone_id": "pune_zone_1",
             "severity": 2,
-            "started_at": (datetime.now(UTC) - timedelta(hours=1)).isoformat(),
+            "started_at": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
             "verified": True,
             "weather_api_raw": {"rainfall_mm_per_hr": 20},
         },

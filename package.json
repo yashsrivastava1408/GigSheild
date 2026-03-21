@@ -1,0 +1,15 @@
+{
+  "name": "gigshield-root",
+  "version": "1.0.0",
+  "description": "Root configuration for GigShield",
+  "scripts": {
+    "dev:backend": "cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:full": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "docker:up": "docker-compose up --build",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

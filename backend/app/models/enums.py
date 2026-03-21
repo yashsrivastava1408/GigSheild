@@ -46,3 +46,34 @@ class PayoutStatus(str, Enum):
 class PaymentMethod(str, Enum):
     upi = "upi"
     bank_transfer = "bank_transfer"
+
+
+class PayoutProfileStatus(str, Enum):
+    missing = "missing"
+    pending = "pending"
+    verified = "verified"
+    rejected = "rejected"
+
+
+class PolicyPaymentStatus(str, Enum):
+    created = "created"
+    verified = "verified"
+    paid = "paid"
+    failed = "failed"
+
+
+class SignalImpact(str, Enum):
+    positive = "positive"
+    negative = "negative"
+
+
+class RiskTier(str, Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+
+
+class RoutingDecision(str, Enum):
+    approve = "approve"
+    manual_review = "manual_review"
+    reject = "reject"

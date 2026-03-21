@@ -1,22 +1,32 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import access_token_expiry, ensure_utc, generate_otp_code, generate_session_token, otp_expiry
+from app.core.security import (
+    access_token_expiry,
+    ensure_utc,
+    generate_admin_token,
+    generate_otp_code,
+    generate_session_token,
+    otp_expiry,
+)
+from app.core.time import utcnow
 from app.models.auth_session import AuthSession
 from app.models.otp_challenge import OtpChallenge
 from app.repositories.auth import (
+    count_recent_otp_requests,
     create_auth_session,
     create_otp_challenge,
     delete_auth_sessions_for_worker,
     get_latest_active_otp,
+    increment_otp_attempts,
     mark_otp_consumed,
 )
 from app.repositories.workers import get_worker_by_phone
-from app.schemas.auth import AuthSessionResponse, OtpRequestResponse
+from app.schemas.auth import AdminLoginResponse, AuthSessionResponse, OtpRequestResponse
 from app.schemas.worker import WorkerResponse
 from app.services.providers import send_otp_sms
 
@@ -25,6 +35,11 @@ def request_login_otp(db: Session, phone: str) -> OtpRequestResponse:
     worker = get_worker_by_phone(db, phone)
     if worker is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found for this phone.")
+
+    window_start = utcnow() - timedelta(minutes=settings.otp_request_window_minutes)
+    recent_requests = count_recent_otp_requests(db, phone, window_start)
+    if recent_requests >= settings.otp_max_requests_per_window:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many OTP requests. Try again later.")
 
     challenge = OtpChallenge(
         id=str(uuid.uuid4()),
@@ -48,7 +63,17 @@ def verify_login_otp(db: Session, phone: str, otp_code: str) -> AuthSessionRespo
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Worker not found for this phone.")
 
     challenge = get_latest_active_otp(db, phone)
-    if challenge is None or ensure_utc(challenge.expires_at) < datetime.now(UTC) or challenge.otp_code != otp_code:
+    if challenge is None or ensure_utc(challenge.expires_at) < utcnow():
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired OTP.")
+    if challenge.attempt_count >= settings.otp_max_verify_attempts:
+        challenge.consumed = True
+        mark_otp_consumed(db, challenge)
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="OTP attempts exceeded. Request a new code.")
+    if challenge.otp_code != otp_code:
+        increment_otp_attempts(db, challenge)
+        if challenge.attempt_count >= settings.otp_max_verify_attempts:
+            challenge.consumed = True
+            mark_otp_consumed(db, challenge)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired OTP.")
 
     mark_otp_consumed(db, challenge)
@@ -65,3 +90,9 @@ def verify_login_otp(db: Session, phone: str, otp_code: str) -> AuthSessionRespo
     )
 
     return AuthSessionResponse(access_token=token, worker=WorkerResponse.model_validate(worker))
+
+
+def login_admin(admin_key: str) -> AdminLoginResponse:
+    if admin_key != settings.admin_api_key:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access denied.")
+    return AdminLoginResponse(access_token=generate_admin_token())

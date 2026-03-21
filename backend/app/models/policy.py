@@ -1,8 +1,9 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import Date, DateTime, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.time import utcnow
 from app.db.base import Base
 from app.models.enums import CoverageTier, PolicyStatus
 
@@ -20,7 +21,7 @@ class Policy(Base):
     status: Mapped[PolicyStatus] = mapped_column(Enum(PolicyStatus), default=PolicyStatus.active, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(UTC),
+        default=utcnow,
         nullable=False,
     )
 
