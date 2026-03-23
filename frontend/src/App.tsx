@@ -269,9 +269,10 @@ export default function App() {
   }, [activeTab, setActiveTab]);
 
   useEffect(() => {
-    // Migration: If the user has the old "dev-admin-key" stuck in localStorage,
-    // and we have a different DEFAULT_ADMIN_KEY configured, migrate it.
-    if (adminKey === "dev-admin-key" && DEFAULT_ADMIN_KEY !== "dev-admin-key") {
+    // Migration: If the user has a legacy key stuck in localStorage,
+    // and we have a new DEFAULT_ADMIN_KEY configured, migrate it.
+    const legacyKeys = ["dev-admin-key", "3f58862a828f4fb5d785542a2d280969ea1a96461d7998a5"];
+    if (legacyKeys.includes(adminKey) && adminKey !== DEFAULT_ADMIN_KEY) {
       setAdminKey(DEFAULT_ADMIN_KEY);
       setAdminToken(""); // Clear old session token as it won't be valid for the new key
     }
