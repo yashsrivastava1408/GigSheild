@@ -1,5 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
-export const DEFAULT_ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY ?? "dev-admin-key";
+export const DEFAULT_ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY ?? "GIGSHIELD ADMIN";
 
 export type Platform = "zomato" | "swiggy" | "zepto" | "blinkit";
 export type CoverageTier = "basic" | "standard" | "premium";
