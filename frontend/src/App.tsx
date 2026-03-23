@@ -268,6 +268,15 @@ export default function App() {
     }
   }, [activeTab, setActiveTab]);
 
+  useEffect(() => {
+    // Migration: If the user has the old "dev-admin-key" stuck in localStorage,
+    // and we have a different DEFAULT_ADMIN_KEY configured, migrate it.
+    if (adminKey === "dev-admin-key" && DEFAULT_ADMIN_KEY !== "dev-admin-key") {
+      setAdminKey(DEFAULT_ADMIN_KEY);
+      setAdminToken(""); // Clear old session token as it won't be valid for the new key
+    }
+  }, [adminKey, setAdminKey, setAdminToken]);
+
   function navigateTo(nextRoute: AppRoute) {
     const nextPath = nextRoute === "admin" ? "/admin" : "/";
     if (window.location.pathname !== nextPath) {
@@ -757,8 +766,8 @@ export default function App() {
           onRejectPayoutProfile={(id) => void handleRejectPayoutProfile(id)}
           onGoWorker={() => navigateTo("worker")}
           onAutoLoadDemo={() => {
-            setAdminKey("ADMIN_API_KEY");
-            void loadAdminPanel("ADMIN_API_KEY");
+            setAdminKey(DEFAULT_ADMIN_KEY);
+            void loadAdminPanel(DEFAULT_ADMIN_KEY);
           }}
         />
       ) : !token || !worker ? (

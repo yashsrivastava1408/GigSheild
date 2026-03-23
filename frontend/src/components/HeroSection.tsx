@@ -1,5 +1,5 @@
 import { motion, type Variants } from "framer-motion";
-import {
+wimport {
   Zap,
   Shield,
   Clock,
